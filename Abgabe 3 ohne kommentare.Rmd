@@ -1,0 +1,330 @@
+---
+title: "Abgabe 3"
+author: "Travis Oswald"
+date: "2025-07-07"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+library(sf)
+library(terra)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library(giscoR)
+library(ggiraph)
+#library(leaflet)
+#library(leafsync)
+#library( mapview)
+#library(leaflet.extras)
+library(tmap)   
+library(ggplot2)
+library(ggiraph)
+library(viridis)
+```
+
+## R Markdown
+
+
+```{r Directory, echo=TRUE}
+##Datensatz Einlesen
+setwd("C:\\Users\\travi\\OneDrive - Universitaet Duisburg-Essen\\SoSe2025\\R-Studio\\3. Arbeitsauftrag")
+getwd()
+wahl <- read.csv("kerg2.csv")
+file_name <- "kerg2.csv"
+
+```
+
+```{r Datensatz, echo=TRUE}
+#Datensatz aufarbeiten/strukturieren
+
+tryCatch({
+  wahl <- read.csv2(
+    file = file_name,
+    encoding = "UTF-8",
+    skip = 9,
+    header = TRUE 
+  )
+  print("Erste Zeilen des Datensatzes 'wahl':")
+  print(head(wahl))
+  print("Spaltennamen des Datensatzes 'wahl':")
+  print(colnames(wahl))
+  num_cols <- ncol(wahl)
+  print(paste("Anzahl der Spalten in 'wahl':", num_cols))
+  print("Struktur des Datensatzes 'wahl':")
+  print(str(wahl))
+  if (num_cols == 18) {
+    print("Ja")
+  } else {
+    print(paste("Nein, Spaltenanzahl:", num_cols))
+    print("Fehler: Überprüfe 'kerg2.csv' oder 'skip' (aktuell: 9).")
+  }
+}, error = function(e) {
+  message("Ein Fehler ist beim Einlesen des Datensatzes aufgetreten:")
+  message(e$message)
+  message("Bitte stellen Sie sicher, dass der Dateiname 'kerg2.csv' korrekt ist und die Datei im Arbeitsverzeichnis existiert.")
+})
+
+```
+
+```{r german_card_0, echo=TRUE}
+#Interaktive Karte in R erstellen
+germany_districs <- gisco_get_nuts(
+  country = "Germany",
+  nuts_level = 3,
+  year = "2021", # Empfohlenes Jahr, da 2024 noch nicht stabil sein könnte
+  epsg = 3035 # EPSG 3035 ist eine gute Wahl für Europa
+) |>
+  as_tibble() |>
+  janitor::clean_names()
+#count(levl_code)
+
+germany_states <- gisco_get_nuts(
+  country = "Germany",
+  nuts_level = 1,
+  year = "2021", # Empfohlenes Jahr, da 2024 noch nicht stabil sein könnte
+  epsg = 3035 # EPSG 3035 ist eine gute Wahl für Europa
+) |>
+  as_tibble() |>
+  janitor::clean_names() 
+
+gg_plt <- germany_districs |>
+  ggplot(aes(geometry = geometry)) +
+  geom_sf(
+    data = germany_states,
+    aes(fill = nuts_name),
+    color ="black",
+    linewidth =0.5
+  ) +
+  geom_sf_interactive(
+    fill = NA,
+    aes(
+      data_id = nuts_id,
+      tooltip = nuts_name
+    ),
+    color = "blue",
+    linewidth = 0.1
+    )
+girafe(ggobj = gg_plt, width_svg = 8, height_svg = 7)
+
+```
+
+```{r subset_spd, echo=TRUE}
+# Sub-Datensatz für die SPD erstellen
+wahl_spd <- wahl %>% filter(Gebietsart == "Wahlkreis", Gruppenname == "SPD")
+
+#Kennwerte für die SPD berechenen 21. Wahlperiode 
+summary(wahl_spd$Prozent)
+# Die Analyse der Wahlkreisergebnissen zeigt, dass die SPD einen durchschnittlichen Wahlanteil von 18.341 % erreicht hat. In einem Wahlkreis erzielte die SPD einen Stimmenanteil von 42.083 %, was den höchsten Stimmenanteil in diesem Wahlkreis bedeutet. Der kleinste Stimmanteil in einem Wahlkreis lag bei 5.962 %. In 25 % der Wahlkreise lag die Zustimmung zwischen 5.962 % und 13.273 %. Weitere 25 % der Wahlkreise gaben Werte zwischen 13.273 % und 17.836 % an. Die Verteilung der restlichen 25 % liegt zwischen 17.836 % und 22.534 %, weitere 25 % zwischen 22.534 % und 42.083 %. Es liegen jedoch keine Angaben zu vier Wahlkreisen vor.
+
+summary(wahl_spd$VorpProzent)
+# Die Analyse der Wahlkreisergebnisse zeigt, dass die SPD einen durchschnittlichen Wahlanteil von 26.26 % erreicht hat. In einem Wahlkreis erzielte die SPD einen Stimmenanteil von 52.81 %, was den höchsten Stimmenanteil in diesem Wahlkreis bedeutet. Der kleinste Stimmanteil in einem Wahlkreis lag bei 11.37 %. In 25 % der Wahlkreise lag die Zustimmung zwischen 11.37 % und 20.92 %. Weitere 25 % der Wahlkreise gaben Werte zwischen 20.92 % und 26.31 % an. Die Verteilung der restlichen 25 % liegt zwischen 26.31 % und 31.02 %, weitere 25 % zwischen 31.02 % und 52.81 %. Es liegen jedoch keine Angaben zu vier Wahlkreisen vor.
+
+'Die SPD hat im Bundesdurchschnitt einen Verlust von Prozentpunkten im Vergleich zum Vorjahr verzeichnet.'
+
+```
+
+```{r structure_df_1, echo=TRUE}
+# Wahlkreis datensatz 
+wk_bt <- read.csv("C:/Users/travi/OneDrive - Universitaet Duisburg-Essen/SoSe2025/R-Studio/3. Arbeitsauftrag/btw21_wahlkreisnamen_utf8.csv")
+
+path_to_wahlkreisnamen_csv <- "C:/Users/travi/OneDrive - Universitaet Duisburg-Essen/SoSe2025/R-Studio/3. Arbeitsauftrag/btw21_wahlkreisnamen_utf8.csv"
+
+tryCatch({
+  wahlkreis <- read.csv2(
+    file = path_to_wahlkreisnamen_csv,
+    encoding = "UTF-8",
+    skip = 7,
+    header = TRUE
+  )
+
+  wahlkreis <- janitor::clean_names(wahlkreis)
+
+  wahl <- wahl %>%
+    filter(if_any(everything(), ~!is.na(.x) & .x != "")) 
+
+  wahlkreis <- wahlkreis %>%
+    select(where(~!all(is.na(.x) | .x == "")))
+
+  if ("gebietsnummer" %in% names(wahlkreis)) {
+    wahlkreis$gebietsnummer <- as.character(wahlkreis$gebietsnummer)
+    wahlkreis$gebietsnummer <- trimws(wahlkreis$gebietsnummer)
+  }
+
+  if ("prozent" %in% names(wahlkreis)) 
+
+
+  print("Erste Zeilen des AUFBEREITETEN Datensatzes 'wahl':")
+  print(head(wahlkreis))
+
+  print("Spaltennamen des AUFBEREITETEN Datensatzes 'wahl':")
+  print(colnames(wahlkreis))
+
+  num_cols_processed <- ncol(wahlkreis)
+  print(paste("Anzahl der Spalten im aufbereiteten 'wahl':", num_cols_processed))
+
+  print("Struktur des AUFBEREITETEN Datensatzes 'wahl':")
+  print(str(wahlkreis))
+
+  if (!("gebietsnummer" %in% names(wahlkreis) && "gruppenname" %in% names(wahlkreis) && "prozent" %in% names(wahlkreis))) {
+    warning("ACHTUNG: Wichtige Spalten (gebietsnummer, gruppenname, prozent) fehlen im aufbereiteten Datensatz 'wahl'.")
+  }
+
+
+}, error = function(e) {
+  message("Ein Fehler ist beim Einlesen oder Aufbereiten des Datensatzes aufgetreten:")
+  message(e$message)
+  message("Bitte stellen Sie sicher, dass der Dateipfad und -name korrekt sind.")
+  message("Überprüfen Sie auch den 'skip'-Parameter und das Trennzeichen/Dezimalzeichen in der CSV-Datei.")
+})
+
+```
+
+```{r wahlkreise, echo=TRUE}
+#Zusammenfügen von beiden Dfs.
+
+unzip( "C:/Users/travi/OneDrive - Universitaet Duisburg-Essen/SoSe2025/R-Studio/3. Arbeitsauftrag/btw25_geometrie_wahlkreise_vg250_shp_geo.zip")
+
+
+
+path_to_wahlkreis_shapefile <- "C:/Users/travi/OneDrive - Universitaet Duisburg-Essen/SoSe2025/R-Studio/3. Arbeitsauftrag/btw21_wahlkreisnamen_utf8.csv"
+
+wk_shapefile <- "C:/Users/travi/OneDrive - Universitaet Duisburg-Essen/SoSe2025/R-Studio/3. Arbeitsauftrag/btw25_geometrie_wahlkreise_vg250_shp_geo"
+
+one_bundestag_wahlkreise_sf <- st_read(wk_shapefile) |>
+  janitor::clean_names() 
+
+print(head(one_bundestag_wahlkreise_sf))
+print(names(one_bundestag_wahlkreise_sf))
+
+
+```
+
+```{r df_gebietsnummer, echo=TRUE}
+one_bundestag_wahlkreise_sf$wkr_nr <- as.character(one_bundestag_wahlkreise_sf$wkr_nr)
+
+wahl_spd$Gebietsnummer <- as.character(wahl_spd$Gebietsnummer) 
+joined_wahlkreis_data <- one_bundestag_wahlkreise_sf %>%
+  left_join(wahl_spd, by = c("wkr_nr" = "Gebietsnummer"))
+```
+
+```{r df_wahlkreise, echo=FALSE}
+
+wahlkreis$wkr_nr<- as.character(wahlkreis$wkr_nr) 
+wahl_spd$Gebietsnummer <- as.character(wahl_spd$Gebietsnummer) 
+
+joined_wahlkreis_data <- one_bundestag_wahlkreise_sf %>%
+  left_join(wahl_spd, by = c( "wkr_nr" = "Gebietsnummer")) 
+
+```
+
+```{r german_card_2, echo=TRUE}
+gg_plot_wk <- ggplot(data = joined_wahlkreis_data) +
+  geom_sf_interactive(
+    aes(
+      fill = Prozent,        
+      tooltip = paste0(      
+        "Wahlkreis: ", wkr_name, "\n",
+        "SPD-Anteil: ", round(Prozent, 2), "%" 
+      ),
+      data_id = wkr_nr
+    ),
+    color = "black",         
+    linewidth = 0.1          
+  ) +
+  scale_fill_viridis_c(
+    option = "magma",         
+    direction = -1,           
+    name = "SPD-Anteil (%)",  
+    breaks = seq(10, 40, by = 5), 
+    limits = c(10, 40)       
+  ) +
+  labs(
+    title = "SPD-Zweitstimmenanteil Bundestagswahl 2025 nach Wahlkreisen",
+    caption = "Daten: Bundeswahlleiterin und Geobasisdaten BKG (2021)"
+  ) +
+  theme_void() + 
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    legend.position = "right" 
+  )
+
+girafe_map <- girafe(
+  ggobj = gg_plot_wk,
+  options = list(
+    opts_tooltip(css = "background-color:white;color:black;padding:5px;border-radius:3px;"),
+    opts_hover(css = "fill:cyan;stroke:black;stroke-width:1px;") 
+  )
+)
+
+girafe_map
+
+```
+
+```{r german_card_3, echo=TRUE}
+one_bundestag_wahlkreise_sf$wkr_nr <- as.character(one_bundestag_wahlkreise_sf$wkr_nr)
+
+wahl_spd$Gebietsnummer <- as.character(wahl_spd$Gebietsnummer)
+
+joined_wahlkreis_data <- one_bundestag_wahlkreise_sf %>%
+  left_join(wahl_spd, by = c("wkr_nr" = "Gebietsnummer"))
+
+wahlkreis$wkr_nr<- as.character(wahlkreis$wkr_nr)
+wahl_spd$Gebietsnummer <- as.character(wahl_spd$Gebietsnummer)
+
+joined_wahlkreis_data <- one_bundestag_wahlkreise_sf %>%
+  left_join(wahl_spd, by = c( "wkr_nr" = "Gebietsnummer"))
+
+library(ggplot2)
+library(ggiraph)
+library(viridis)
+
+gg_plot_wk <- ggplot(data = joined_wahlkreis_data) +
+  geom_sf_interactive(
+    aes(
+      fill = VorpProzent,
+      tooltip = paste0(
+        "Wahlkreis: ", wkr_name, "\n",
+        "SPD-Anteil (Vorperiode): ", round(VorpProzent, 2), "%"
+      ),
+      data_id = wkr_nr
+    ),
+    color = "black",
+    linewidth = 0.1
+  ) +
+  scale_fill_viridis_c(
+    option = "magma",
+    direction = -1,
+    name = "SPD-Anteil (%)",
+    breaks = seq(10, 40, by = 5),
+    limits = c(10, 40)
+  ) +
+  labs(
+    title = "SPD-Zweitstimmenanteil Bundestagswahl 2021 (Vorperiode) nach Wahlkreisen",
+    caption = "Daten: Bundeswahlleiterin und Geobasisdaten BKG (2021)"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    plot.caption = element_text(hjust = 0.5, size = 10),
+    legend.position = "right"
+  )
+
+girafe_map <- girafe(
+  ggobj = gg_plot_wk,
+  options = list(
+    opts_tooltip(css = "background-color:white;color:black;padding:5px;border-radius:3px;"),
+    opts_hover(css = "fill:cyan;stroke:black;stroke-width:1px;")
+  )
+)
+
+girafe_map
+
+```
+
+
+
